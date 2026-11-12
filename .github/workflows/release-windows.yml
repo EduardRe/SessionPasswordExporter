@@ -1,0 +1,73 @@
+name: Windows release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and publish Windows release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install stable Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v2
+
+      - name: Verify tag matches Cargo version
+        shell: pwsh
+        run: |
+          $metadataJson = cargo metadata --no-deps --format-version 1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $metadata = $metadataJson | ConvertFrom-Json
+          $packageVersion = $metadata.packages[0].version
+          $expectedTag = "v$packageVersion"
+
+          if ($env:GITHUB_REF_NAME -ne $expectedTag) {
+            throw "Release tag '$env:GITHUB_REF_NAME' must match Cargo version '$expectedTag'. Update Cargo.toml before creating a release tag."
+          }
+
+          "PACKAGE_VERSION=$packageVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Run tests
+        run: cargo test --all-targets
+
+      - name: Build Windows packages
+        shell: pwsh
+        run: |
+          .\scripts\build-windows-packages.ps1 `
+            -OutputDirectory (Join-Path $env:RUNNER_TEMP "session-password-exporter-release")
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $releaseDirectory = Join-Path $env:RUNNER_TEMP "session-password-exporter-release"
+          $executableX86Path = Join-Path $releaseDirectory "session-password-exporter-x86.exe"
+          $executableX64Path = Join-Path $releaseDirectory "session-password-exporter-x64.exe"
+          $installerX86Path = Join-Path $releaseDirectory "session-password-exporter-$env:PACKAGE_VERSION-setup-windows-x86.exe"
+          $installerX64Path = Join-Path $releaseDirectory "session-password-exporter-$env:PACKAGE_VERSION-setup-windows-x64.exe"
+          $portableArchivePath = Join-Path $releaseDirectory "session-password-exporter-$env:GITHUB_REF_NAME-portable-windows.zip"
+          $checksumPath = Join-Path $releaseDirectory "session-password-exporter-$env:GITHUB_REF_NAME-windows.sha256"
+
+          gh release create $env:GITHUB_REF_NAME `
+            $executableX86Path `
+            $executableX64Path `
+            $installerX86Path `
+            $installerX64Path `
+            $portableArchivePath `
+            $checksumPath `
+            --title $env:GITHUB_REF_NAME `
+            --generate-notes `
+            --verify-tag

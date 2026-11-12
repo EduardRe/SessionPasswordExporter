@@ -1,0 +1,530 @@
+use crate::config::constants::*;
+use crate::core::model::LanguagePreference;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Language {
+    Russian,
+    English,
+}
+
+pub struct Labels {
+    pub add_files: &'static str,
+    pub add_folder: &'static str,
+    pub read_registry: &'static str,
+    pub show_all: &'static str,
+    pub hide_all: &'static str,
+    pub copy_all: &'static str,
+    pub save_export: &'static str,
+    pub clear_list: &'static str,
+    pub settings: &'static str,
+    pub about: &'static str,
+    pub about_author: &'static str,
+    pub about_author_name: &'static str,
+    pub about_version: &'static str,
+    pub about_repository: &'static str,
+    pub about_license: &'static str,
+    pub about_open_link: &'static str,
+    pub action_on_reveal: &'static str,
+    pub export_format: &'static str,
+    pub col_host: &'static str,
+    pub col_user: &'static str,
+    pub col_password: &'static str,
+    pub row_show: &'static str,
+    pub row_hide: &'static str,
+    pub row_copy: &'static str,
+    pub row_show_copy: &'static str,
+    pub password_not_stored: &'static str,
+    pub password_protected: &'static str,
+    pub password_unavailable: &'static str,
+    pub header_title: &'static str,
+    pub header_subtitle: &'static str,
+    pub section_sessions: &'static str,
+    pub search_placeholder: &'static str,
+    pub clear_search: &'static str,
+    pub search_no_results: &'static str,
+    pub empty_title: &'static str,
+    pub empty_hint: &'static str,
+    pub drop_hint: &'static str,
+    pub session_count_prefix: &'static str,
+    pub no_status: &'static str,
+    pub settings_saved: &'static str,
+    pub search_exclude_collapsed: &'static str,
+    pub list_cleared: &'static str,
+    pub status_group_removed: &'static str,
+    pub folder_picker_title: &'static str,
+    pub file_picker_title: &'static str,
+    pub save_picker_title: &'static str,
+    pub file_filter_label: &'static str,
+    pub format_text: &'static str,
+    pub format_json: &'static str,
+    pub format_xml: &'static str,
+    pub action_show: &'static str,
+    pub action_copy: &'static str,
+    pub action_show_copy: &'static str,
+    pub status_imported: &'static str,
+    pub status_warnings: &'static str,
+    pub status_exported: &'static str,
+    pub status_saved: &'static str,
+    pub language_label: &'static str,
+    pub language_system: &'static str,
+    pub language_russian: &'static str,
+    pub language_english: &'static str,
+    pub theme_label: &'static str,
+    pub theme_system: &'static str,
+    pub theme_light: &'static str,
+    pub theme_dark: &'static str,
+    pub text_session: &'static str,
+    pub text_host: &'static str,
+    pub text_user: &'static str,
+    pub text_password: &'static str,
+    pub text_folder: &'static str,
+    pub text_source: &'static str,
+    pub source_group_registry: &'static str,
+    pub source_group_unknown: &'static str,
+    pub source_group_remove: &'static str,
+    pub master_password_group_hint: &'static str,
+    pub master_password_button: &'static str,
+    pub master_password_title: &'static str,
+    pub master_password_field: &'static str,
+    pub master_password_show: &'static str,
+    pub master_password_hide: &'static str,
+    pub master_password_decrypt: &'static str,
+    pub master_password_working: &'static str,
+    pub master_password_task_failed: &'static str,
+    pub master_password_close: &'static str,
+    pub master_password_empty: &'static str,
+    pub master_password_success: &'static str,
+    pub master_password_results: &'static str,
+    pub master_password_unlocked: &'static str,
+    pub master_password_failed: &'static str,
+    pub recovery_title: &'static str,
+    pub recovery_start: &'static str,
+    pub recovery_start_all: &'static str,
+    pub recovery_pause: &'static str,
+    pub recovery_resume: &'static str,
+    pub recovery_stop: &'static str,
+    pub recovery_digits: &'static str,
+    pub recovery_letters: &'static str,
+    pub recovery_symbols: &'static str,
+    pub recovery_space_included: &'static str,
+    pub recovery_minimum_length: &'static str,
+    pub recovery_maximum_length: &'static str,
+    pub recovery_combination: &'static str,
+    pub recovery_attempts: &'static str,
+    pub recovery_length: &'static str,
+    pub recovery_speed: &'static str,
+    pub recovery_elapsed: &'static str,
+    pub recovery_found: &'static str,
+    pub recovery_exhausted: &'static str,
+    pub recovery_waiting: &'static str,
+    pub recovery_status_running: &'static str,
+    pub recovery_status_paused: &'static str,
+    pub recovery_copy: &'static str,
+    pub recovery_settings: &'static str,
+    pub recovery_keyspace: &'static str,
+    pub recovery_invalid_settings: &'static str,
+    pub recovery_checkpoint_failed: &'static str,
+    pub recovery_no_protected: &'static str,
+    pub partial_copy_title: &'static str,
+    pub partial_export_title: &'static str,
+    pub partial_copy_message: &'static str,
+    pub partial_export_message: &'static str,
+    pub partial_included: &'static str,
+    pub partial_none_included: &'static str,
+    pub partial_skipped: &'static str,
+    pub continue_label: &'static str,
+    pub cancel: &'static str,
+    pub no_input: &'static str,
+    pub no_sessions: &'static str,
+    pub unsupported_platform: &'static str,
+    pub output_write_failed: &'static str,
+    pub invalid_settings: &'static str,
+    pub settings_write_failed: &'static str,
+    pub open_gui_failed: &'static str,
+    pub registry_read_failed: &'static str,
+}
+
+const RUSSIAN: Labels = Labels {
+    add_files: UI_ADD_FILES,
+    add_folder: UI_ADD_FOLDER,
+    read_registry: UI_READ_REGISTRY,
+    show_all: UI_SHOW_ALL,
+    hide_all: UI_HIDE_ALL,
+    copy_all: UI_COPY_ALL,
+    save_export: UI_SAVE_EXPORT,
+    clear_list: UI_CLEAR_LIST,
+    settings: UI_SETTINGS,
+    about: UI_ABOUT,
+    about_author: UI_ABOUT_AUTHOR,
+    about_author_name: APP_AUTHOR_RUSSIAN,
+    about_version: UI_ABOUT_VERSION,
+    about_repository: UI_ABOUT_REPOSITORY,
+    about_license: UI_ABOUT_LICENSE,
+    about_open_link: UI_ABOUT_OPEN_LINK,
+    action_on_reveal: UI_ACTION_ON_REVEAL,
+    export_format: UI_EXPORT_FORMAT,
+    col_host: UI_COL_HOST,
+    col_user: UI_COL_USER,
+    col_password: UI_COL_PASSWORD,
+    row_show: UI_ROW_SHOW,
+    row_hide: UI_ROW_HIDE,
+    row_copy: UI_ROW_COPY,
+    row_show_copy: UI_ROW_SHOW_COPY,
+    password_not_stored: UI_PASSWORD_NOT_STORED,
+    password_protected: UI_PASSWORD_PROTECTED,
+    password_unavailable: UI_PASSWORD_UNAVAILABLE,
+    header_title: UI_HEADER_TITLE,
+    header_subtitle: UI_HEADER_SUBTITLE,
+    section_sessions: UI_SECTION_SESSIONS,
+    search_placeholder: UI_SEARCH_PLACEHOLDER,
+    clear_search: UI_CLEAR_SEARCH,
+    search_no_results: UI_SEARCH_NO_RESULTS,
+    empty_title: UI_EMPTY_TITLE,
+    empty_hint: UI_EMPTY_HINT,
+    drop_hint: UI_DROP_HINT,
+    session_count_prefix: UI_SESSION_COUNT_PREFIX,
+    no_status: UI_NO_STATUS,
+    settings_saved: UI_SETTINGS_SAVED,
+    search_exclude_collapsed: UI_SEARCH_EXCLUDE_COLLAPSED,
+    list_cleared: UI_STATUS_LIST_CLEARED,
+    status_group_removed: UI_STATUS_GROUP_REMOVED,
+    folder_picker_title: UI_FOLDER_PICKER_TITLE,
+    file_picker_title: UI_FILE_PICKER_TITLE,
+    save_picker_title: UI_SAVE_PICKER_TITLE,
+    file_filter_label: UI_FILE_FILTER_LABEL,
+    format_text: UI_FORMAT_TEXT,
+    format_json: UI_FORMAT_JSON,
+    format_xml: UI_FORMAT_XML,
+    action_show: UI_ACTION_SHOW,
+    action_copy: UI_ACTION_COPY,
+    action_show_copy: UI_ACTION_SHOW_COPY,
+    status_imported: UI_STATUS_IMPORTED,
+    status_warnings: UI_STATUS_WARNINGS,
+    status_exported: UI_STATUS_EXPORTED,
+    status_saved: UI_STATUS_SAVED,
+    language_label: UI_LANGUAGE,
+    language_system: UI_LANGUAGE_SYSTEM,
+    language_russian: UI_LANGUAGE_RUSSIAN,
+    language_english: UI_LANGUAGE_ENGLISH,
+    theme_label: UI_THEME_LABEL,
+    theme_system: UI_THEME_SYSTEM,
+    theme_light: UI_THEME_LIGHT,
+    theme_dark: UI_THEME_DARK,
+    text_session: UI_TEXT_SESSION,
+    text_host: UI_TEXT_HOST,
+    text_user: UI_TEXT_USER,
+    text_password: UI_TEXT_PASSWORD,
+    text_folder: UI_TEXT_FOLDER,
+    text_source: UI_TEXT_SOURCE,
+    source_group_registry: UI_SOURCE_GROUP_REGISTRY,
+    source_group_unknown: UI_SOURCE_GROUP_UNKNOWN,
+    source_group_remove: UI_SOURCE_GROUP_REMOVE,
+    master_password_group_hint: UI_MASTER_PASSWORD_GROUP_HINT,
+    master_password_button: UI_MASTER_PASSWORD_BUTTON,
+    master_password_title: UI_MASTER_PASSWORD_TITLE,
+    master_password_field: UI_MASTER_PASSWORD_FIELD,
+    master_password_show: UI_MASTER_PASSWORD_SHOW,
+    master_password_hide: UI_MASTER_PASSWORD_HIDE,
+    master_password_decrypt: UI_MASTER_PASSWORD_DECRYPT,
+    master_password_working: UI_MASTER_PASSWORD_WORKING,
+    master_password_task_failed: UI_MASTER_PASSWORD_TASK_FAILED,
+    master_password_close: UI_MASTER_PASSWORD_CLOSE,
+    master_password_empty: UI_MASTER_PASSWORD_EMPTY,
+    master_password_success: UI_MASTER_PASSWORD_SUCCESS,
+    master_password_results: UI_MASTER_PASSWORD_RESULTS,
+    master_password_unlocked: UI_MASTER_PASSWORD_UNLOCKED,
+    master_password_failed: UI_MASTER_PASSWORD_FAILED,
+    recovery_title: UI_RECOVERY_TITLE,
+    recovery_start: UI_RECOVERY_START,
+    recovery_start_all: UI_RECOVERY_START_ALL,
+    recovery_pause: UI_RECOVERY_PAUSE,
+    recovery_resume: UI_RECOVERY_RESUME,
+    recovery_stop: UI_RECOVERY_STOP,
+    recovery_digits: UI_RECOVERY_DIGITS,
+    recovery_letters: UI_RECOVERY_LETTERS,
+    recovery_symbols: UI_RECOVERY_SYMBOLS,
+    recovery_space_included: UI_RECOVERY_SPACE_INCLUDED,
+    recovery_minimum_length: UI_RECOVERY_MINIMUM_LENGTH,
+    recovery_maximum_length: UI_RECOVERY_MAXIMUM_LENGTH,
+    recovery_combination: UI_RECOVERY_COMBINATION,
+    recovery_attempts: UI_RECOVERY_ATTEMPTS,
+    recovery_length: UI_RECOVERY_LENGTH,
+    recovery_speed: UI_RECOVERY_SPEED,
+    recovery_elapsed: UI_RECOVERY_ELAPSED,
+    recovery_found: UI_RECOVERY_FOUND,
+    recovery_exhausted: UI_RECOVERY_EXHAUSTED,
+    recovery_waiting: UI_RECOVERY_WAITING,
+    recovery_status_running: UI_RECOVERY_STATUS_RUNNING,
+    recovery_status_paused: UI_RECOVERY_STATUS_PAUSED,
+    recovery_copy: UI_RECOVERY_COPY,
+    recovery_settings: UI_RECOVERY_SETTINGS,
+    recovery_keyspace: UI_RECOVERY_KEYSPACE,
+    recovery_invalid_settings: UI_RECOVERY_INVALID_SETTINGS,
+    recovery_checkpoint_failed: UI_RECOVERY_CHECKPOINT_FAILED,
+    recovery_no_protected: UI_RECOVERY_NO_PROTECTED,
+    partial_copy_title: UI_PARTIAL_COPY_TITLE,
+    partial_export_title: UI_PARTIAL_EXPORT_TITLE,
+    partial_copy_message: UI_PARTIAL_COPY_MESSAGE,
+    partial_export_message: UI_PARTIAL_EXPORT_MESSAGE,
+    partial_included: UI_PARTIAL_INCLUDED,
+    partial_none_included: UI_PARTIAL_NONE_INCLUDED,
+    partial_skipped: UI_PARTIAL_SKIPPED,
+    continue_label: UI_CONTINUE,
+    cancel: UI_CANCEL,
+    no_input: STATUS_NO_INPUT,
+    no_sessions: STATUS_NO_SESSIONS,
+    unsupported_platform: STATUS_UNSUPPORTED_PLATFORM,
+    output_write_failed: STATUS_OUTPUT_WRITE_FAILED,
+    invalid_settings: STATUS_INVALID_SETTINGS,
+    settings_write_failed: STATUS_SETTINGS_WRITE_FAILED,
+    open_gui_failed: STATUS_OPEN_GUI_FAILED,
+    registry_read_failed: ERROR_READ_REGISTRY,
+};
+
+const ENGLISH: Labels = Labels {
+    add_files: EN_UI_ADD_FILES,
+    add_folder: EN_UI_ADD_FOLDER,
+    read_registry: EN_UI_READ_REGISTRY,
+    show_all: EN_UI_SHOW_ALL,
+    hide_all: EN_UI_HIDE_ALL,
+    copy_all: EN_UI_COPY_ALL,
+    save_export: EN_UI_SAVE_EXPORT,
+    clear_list: EN_UI_CLEAR_LIST,
+    settings: EN_UI_SETTINGS,
+    about: EN_UI_ABOUT,
+    about_author: EN_UI_ABOUT_AUTHOR,
+    about_author_name: EN_UI_ABOUT_AUTHOR_NAME,
+    about_version: EN_UI_ABOUT_VERSION,
+    about_repository: EN_UI_ABOUT_REPOSITORY,
+    about_license: EN_UI_ABOUT_LICENSE,
+    about_open_link: EN_UI_ABOUT_OPEN_LINK,
+    action_on_reveal: EN_UI_ACTION_ON_REVEAL,
+    export_format: EN_UI_EXPORT_FORMAT,
+    col_host: EN_UI_COL_HOST,
+    col_user: EN_UI_COL_USER,
+    col_password: EN_UI_COL_PASSWORD,
+    row_show: EN_UI_ROW_SHOW,
+    row_hide: EN_UI_ROW_HIDE,
+    row_copy: EN_UI_ROW_COPY,
+    row_show_copy: EN_UI_ROW_SHOW_COPY,
+    password_not_stored: EN_UI_PASSWORD_NOT_STORED,
+    password_protected: EN_UI_PASSWORD_PROTECTED,
+    password_unavailable: EN_UI_PASSWORD_UNAVAILABLE,
+    header_title: EN_UI_HEADER_TITLE,
+    header_subtitle: EN_UI_HEADER_SUBTITLE,
+    section_sessions: EN_UI_SECTION_SESSIONS,
+    search_placeholder: EN_UI_SEARCH_PLACEHOLDER,
+    clear_search: EN_UI_CLEAR_SEARCH,
+    search_no_results: EN_UI_SEARCH_NO_RESULTS,
+    empty_title: EN_UI_EMPTY_TITLE,
+    empty_hint: EN_UI_EMPTY_HINT,
+    drop_hint: EN_UI_DROP_HINT,
+    session_count_prefix: EN_UI_SESSION_COUNT_PREFIX,
+    no_status: EN_UI_NO_STATUS,
+    settings_saved: EN_UI_SETTINGS_SAVED,
+    search_exclude_collapsed: EN_UI_SEARCH_EXCLUDE_COLLAPSED,
+    list_cleared: EN_UI_STATUS_LIST_CLEARED,
+    status_group_removed: EN_UI_STATUS_GROUP_REMOVED,
+    folder_picker_title: EN_UI_FOLDER_PICKER_TITLE,
+    file_picker_title: EN_UI_FILE_PICKER_TITLE,
+    save_picker_title: EN_UI_SAVE_PICKER_TITLE,
+    file_filter_label: EN_UI_FILE_FILTER_LABEL,
+    format_text: EN_UI_FORMAT_TEXT,
+    format_json: EN_UI_FORMAT_JSON,
+    format_xml: EN_UI_FORMAT_XML,
+    action_show: EN_UI_ACTION_SHOW,
+    action_copy: EN_UI_ACTION_COPY,
+    action_show_copy: EN_UI_ACTION_SHOW_COPY,
+    status_imported: EN_UI_STATUS_IMPORTED,
+    status_warnings: EN_UI_STATUS_WARNINGS,
+    status_exported: EN_UI_STATUS_EXPORTED,
+    status_saved: EN_UI_STATUS_SAVED,
+    language_label: EN_UI_LANGUAGE,
+    language_system: EN_UI_LANGUAGE_SYSTEM,
+    language_russian: EN_UI_LANGUAGE_RUSSIAN,
+    language_english: EN_UI_LANGUAGE_ENGLISH,
+    theme_label: EN_UI_THEME_LABEL,
+    theme_system: EN_UI_THEME_SYSTEM,
+    theme_light: EN_UI_THEME_LIGHT,
+    theme_dark: EN_UI_THEME_DARK,
+    text_session: EN_UI_TEXT_SESSION,
+    text_host: EN_UI_TEXT_HOST,
+    text_user: EN_UI_TEXT_USER,
+    text_password: EN_UI_TEXT_PASSWORD,
+    text_folder: EN_UI_TEXT_FOLDER,
+    text_source: EN_UI_TEXT_SOURCE,
+    source_group_registry: EN_UI_SOURCE_GROUP_REGISTRY,
+    source_group_unknown: EN_UI_SOURCE_GROUP_UNKNOWN,
+    source_group_remove: EN_UI_SOURCE_GROUP_REMOVE,
+    master_password_group_hint: EN_UI_MASTER_PASSWORD_GROUP_HINT,
+    master_password_button: EN_UI_MASTER_PASSWORD_BUTTON,
+    master_password_title: EN_UI_MASTER_PASSWORD_TITLE,
+    master_password_field: EN_UI_MASTER_PASSWORD_FIELD,
+    master_password_show: EN_UI_MASTER_PASSWORD_SHOW,
+    master_password_hide: EN_UI_MASTER_PASSWORD_HIDE,
+    master_password_decrypt: EN_UI_MASTER_PASSWORD_DECRYPT,
+    master_password_working: EN_UI_MASTER_PASSWORD_WORKING,
+    master_password_task_failed: EN_UI_MASTER_PASSWORD_TASK_FAILED,
+    master_password_close: EN_UI_MASTER_PASSWORD_CLOSE,
+    master_password_empty: EN_UI_MASTER_PASSWORD_EMPTY,
+    master_password_success: EN_UI_MASTER_PASSWORD_SUCCESS,
+    master_password_results: EN_UI_MASTER_PASSWORD_RESULTS,
+    master_password_unlocked: EN_UI_MASTER_PASSWORD_UNLOCKED,
+    master_password_failed: EN_UI_MASTER_PASSWORD_FAILED,
+    recovery_title: EN_UI_RECOVERY_TITLE,
+    recovery_start: EN_UI_RECOVERY_START,
+    recovery_start_all: EN_UI_RECOVERY_START_ALL,
+    recovery_pause: EN_UI_RECOVERY_PAUSE,
+    recovery_resume: EN_UI_RECOVERY_RESUME,
+    recovery_stop: EN_UI_RECOVERY_STOP,
+    recovery_digits: EN_UI_RECOVERY_DIGITS,
+    recovery_letters: EN_UI_RECOVERY_LETTERS,
+    recovery_symbols: EN_UI_RECOVERY_SYMBOLS,
+    recovery_space_included: EN_UI_RECOVERY_SPACE_INCLUDED,
+    recovery_minimum_length: EN_UI_RECOVERY_MINIMUM_LENGTH,
+    recovery_maximum_length: EN_UI_RECOVERY_MAXIMUM_LENGTH,
+    recovery_combination: EN_UI_RECOVERY_COMBINATION,
+    recovery_attempts: EN_UI_RECOVERY_ATTEMPTS,
+    recovery_length: EN_UI_RECOVERY_LENGTH,
+    recovery_speed: EN_UI_RECOVERY_SPEED,
+    recovery_elapsed: EN_UI_RECOVERY_ELAPSED,
+    recovery_found: EN_UI_RECOVERY_FOUND,
+    recovery_exhausted: EN_UI_RECOVERY_EXHAUSTED,
+    recovery_waiting: EN_UI_RECOVERY_WAITING,
+    recovery_status_running: EN_UI_RECOVERY_STATUS_RUNNING,
+    recovery_status_paused: EN_UI_RECOVERY_STATUS_PAUSED,
+    recovery_copy: EN_UI_RECOVERY_COPY,
+    recovery_settings: EN_UI_RECOVERY_SETTINGS,
+    recovery_keyspace: EN_UI_RECOVERY_KEYSPACE,
+    recovery_invalid_settings: EN_UI_RECOVERY_INVALID_SETTINGS,
+    recovery_checkpoint_failed: EN_UI_RECOVERY_CHECKPOINT_FAILED,
+    recovery_no_protected: EN_UI_RECOVERY_NO_PROTECTED,
+    partial_copy_title: EN_UI_PARTIAL_COPY_TITLE,
+    partial_export_title: EN_UI_PARTIAL_EXPORT_TITLE,
+    partial_copy_message: EN_UI_PARTIAL_COPY_MESSAGE,
+    partial_export_message: EN_UI_PARTIAL_EXPORT_MESSAGE,
+    partial_included: EN_UI_PARTIAL_INCLUDED,
+    partial_none_included: EN_UI_PARTIAL_NONE_INCLUDED,
+    partial_skipped: EN_UI_PARTIAL_SKIPPED,
+    continue_label: EN_UI_CONTINUE,
+    cancel: EN_UI_CANCEL,
+    no_input: EN_STATUS_NO_INPUT,
+    no_sessions: EN_STATUS_NO_SESSIONS,
+    unsupported_platform: EN_STATUS_UNSUPPORTED_PLATFORM,
+    output_write_failed: EN_STATUS_OUTPUT_WRITE_FAILED,
+    invalid_settings: EN_STATUS_INVALID_SETTINGS,
+    settings_write_failed: EN_STATUS_SETTINGS_WRITE_FAILED,
+    open_gui_failed: EN_STATUS_OPEN_GUI_FAILED,
+    registry_read_failed: EN_STATUS_REGISTRY_READ_FAILED,
+};
+
+pub fn labels(language: Language) -> &'static Labels {
+    match language {
+        Language::Russian => &RUSSIAN,
+        Language::English => &ENGLISH,
+    }
+}
+
+pub fn resolve_language(preference: LanguagePreference) -> Language {
+    resolve_language_for_locale(preference, sys_locale::get_locale().as_deref())
+}
+
+fn resolve_language_for_locale(preference: LanguagePreference, locale: Option<&str>) -> Language {
+    match preference {
+        LanguagePreference::Russian => Language::Russian,
+        LanguagePreference::English => Language::English,
+        LanguagePreference::System => detect_language(locale),
+    }
+}
+
+fn detect_language(locale: Option<&str>) -> Language {
+    let language_tag = locale
+        .unwrap_or_default()
+        .split(['-', '_', '.'])
+        .next()
+        .unwrap_or_default();
+    if language_tag.eq_ignore_ascii_case("ru") {
+        Language::Russian
+    } else {
+        Language::English
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recognizes_russian_system_locale_variants() {
+        assert_eq!(detect_language(Some("ru-RU")), Language::Russian);
+        assert_eq!(detect_language(Some("ru_RU.UTF-8")), Language::Russian);
+        assert_eq!(detect_language(Some("RU")), Language::Russian);
+    }
+
+    #[test]
+    fn uses_english_for_english_and_unknown_system_locales() {
+        assert_eq!(detect_language(Some("en-US")), Language::English);
+        assert_eq!(detect_language(Some("de-DE")), Language::English);
+        assert_eq!(detect_language(None), Language::English);
+    }
+
+    #[test]
+    fn explicit_language_setting_overrides_system_locale() {
+        assert_eq!(
+            resolve_language_for_locale(LanguagePreference::English, Some("ru-RU")),
+            Language::English
+        );
+        assert_eq!(
+            resolve_language_for_locale(LanguagePreference::Russian, Some("en-US")),
+            Language::Russian
+        );
+    }
+
+    #[test]
+    fn language_names_are_not_abbreviated() {
+        assert_eq!(labels(Language::Russian).language_russian, "Русский");
+        assert_eq!(labels(Language::Russian).language_english, "English");
+        assert_eq!(labels(Language::English).language_russian, "Русский");
+        assert_eq!(labels(Language::English).language_english, "English");
+    }
+
+    #[test]
+    fn drag_and_drop_hint_is_localized_and_mentions_folders() {
+        assert_eq!(labels(Language::Russian).drop_hint, UI_DROP_HINT);
+        assert_eq!(labels(Language::English).drop_hint, EN_UI_DROP_HINT);
+    }
+
+    #[test]
+    fn about_menu_labels_are_localized() {
+        assert_eq!(labels(Language::Russian).about, UI_ABOUT);
+        assert_eq!(labels(Language::English).about, EN_UI_ABOUT);
+        assert_eq!(
+            labels(Language::Russian).about_author_name,
+            APP_AUTHOR_RUSSIAN
+        );
+        assert_eq!(
+            labels(Language::English).about_author_name,
+            APP_AUTHOR_ENGLISH
+        );
+    }
+
+    #[test]
+    fn session_search_labels_are_localized() {
+        assert_eq!(
+            labels(Language::Russian).search_placeholder,
+            UI_SEARCH_PLACEHOLDER
+        );
+        assert_eq!(
+            labels(Language::Russian).search_no_results,
+            UI_SEARCH_NO_RESULTS
+        );
+        assert_eq!(
+            labels(Language::English).search_placeholder,
+            EN_UI_SEARCH_PLACEHOLDER
+        );
+        assert_eq!(
+            labels(Language::English).search_no_results,
+            EN_UI_SEARCH_NO_RESULTS
+        );
+    }
+}

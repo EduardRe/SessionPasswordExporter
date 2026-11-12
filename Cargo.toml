@@ -1,0 +1,32 @@
+[package]
+name = "session-password-exporter"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "Inspect and export sessions from WinSCP configuration files"
+license = "MIT"
+
+[dependencies]
+aes = "0.8"
+clap = { version = "4", features = ["derive"] }
+directories = "6"
+eframe = { version = "0.37", features = ["persistence"] }
+rfd = "0.16"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.10"
+sys-locale = "0.3"
+zeroize = "1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Console", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
+winreg = "0.55"
+
+# Backport the upstream Windows keyboard-layout-switch freeze fix for Punto Switcher.
+[patch.crates-io]
+winit = { path = "patches/winit" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
