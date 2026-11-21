@@ -5,10 +5,11 @@ use eframe::egui;
 use super::theme;
 use crate::config::constants::{
     FOLDER_PATH_SEPARATOR, PASSWORD_MASK, TREE_INDENT, UI_BUTTON_HEIGHT, UI_COLLAPSED_INDICATOR,
-    UI_EXPANDED_INDICATOR, UI_GROUP_MASTER_PASSWORD_BUTTON_WIDTH, UI_LIST_SESSION_ROW_HEIGHT,
-    UI_LIST_TREE_ROW_HEIGHT, UI_MASTER_PASSWORD_LOCK, UI_META_SIZE, UI_PASSWORD_AREA_WIDTH,
-    UI_PASSWORD_CHARS_PER_LINE, UI_PASSWORD_LINE_HEIGHT, UI_RECOVERY_GROUP_BUTTON_WIDTH,
-    UI_SECRET_SIZE, UI_SESSION_TITLE_SIZE, UI_SOURCE_REMOVE_BUTTON_WIDTH,
+    UI_EXPANDED_INDICATOR, UI_GROUP_MASTER_PASSWORD_BUTTON_WIDTH, UI_LAYOUT_GAP,
+    UI_LIST_SESSION_ROW_HEIGHT, UI_LIST_TREE_ROW_HEIGHT, UI_MASTER_PASSWORD_LOCK, UI_META_SIZE,
+    UI_PASSWORD_AREA_WIDTH, UI_PASSWORD_CHARS_PER_LINE, UI_PASSWORD_LINE_HEIGHT,
+    UI_RECOVERY_GROUP_BUTTON_WIDTH, UI_SECRET_SIZE, UI_SESSION_TITLE_SIZE,
+    UI_SOURCE_REMOVE_BUTTON_WIDTH,
 };
 use crate::config::localization::{Labels, Language};
 use crate::core::grouping::{SessionGroup, group_session_indices};
@@ -154,7 +155,11 @@ impl VisibleRow {
                             PasswordStatus::MasterPasswordProtected => text.password_protected,
                             PasswordStatus::CouldNotDecrypt => text.password_unavailable,
                         };
-                        let lines = password.len().div_ceil(UI_PASSWORD_CHARS_PER_LINE).max(1);
+                        let lines = password
+                            .chars()
+                            .count()
+                            .div_ceil(UI_PASSWORD_CHARS_PER_LINE)
+                            .max(1);
                         UI_LIST_SESSION_ROW_HEIGHT
                             + lines.saturating_sub(1) as f32 * UI_PASSWORD_LINE_HEIGHT
                     })
@@ -625,64 +630,71 @@ fn render_session_row(
     let mut clicked = false;
     let palette = theme::palette(ui);
     let content_color = if muted { palette.muted } else { palette.text };
+    let protocol_color = if muted { palette.muted } else { palette.accent };
+    let host = if session.host.is_empty() {
+        "—"
+    } else {
+        session.host.as_str()
+    };
+    let port = session.port.to_string();
+    let username = if session.username.is_empty() {
+        "—"
+    } else {
+        session.username.as_str()
+    };
     ui.horizontal(|ui| {
         ui.add_space(depth as f32 * TREE_INDENT);
-        let frame = if muted {
-            theme::subdued_card_frame(ui)
-        } else {
-            theme::card_frame(ui)
-        };
-        frame.show(ui, |ui| {
+        let frame = theme::list_row_frame(ui, muted);
+        let action_size = row_action_button_size(ui, text.row_show_copy);
+        let row = frame.show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.add(
-                        egui::Label::new(
-                            egui::RichText::new(&session.name)
-                                .size(UI_SESSION_TITLE_SIZE)
-                                .strong()
-                                .color(content_color),
-                        )
-                        .truncate(),
-                    );
-                    ui.horizontal(|ui| {
-                        ui.label(
-                            egui::RichText::new(text.col_host)
-                                .size(UI_META_SIZE)
-                                .color(palette.muted),
+                let width = ui.available_width();
+                let reserved = UI_PASSWORD_AREA_WIDTH + UI_LAYOUT_GAP * 2.0 + action_size.x;
+                let identity_width = if width > reserved + 120.0 {
+                    width - reserved
+                } else {
+                    width * 0.46
+                };
+                ui.allocate_ui_with_layout(
+                    egui::vec2(identity_width, UI_BUTTON_HEIGHT),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        let rest = ui.available_width();
+                        let protocol_width = 76.0_f32.min(rest);
+                        let port_width = 48.0_f32.min((rest - protocol_width).max(0.0));
+                        let flexible = (rest - protocol_width - port_width).max(0.0);
+                        let name_width = flexible * 0.36;
+                        let host_width = flexible * 0.40;
+                        let user_width = (flexible - name_width - host_width).max(0.0);
+                        add_session_fields(
+                            ui,
+                            &SessionIdentity {
+                                name: &session.name,
+                                protocol: session.connection.label(),
+                                host,
+                                port: &port,
+                                user: username,
+                                content_color,
+                                protocol_color,
+                                widths: Some(IdentityWidths {
+                                    name: name_width,
+                                    protocol: protocol_width,
+                                    host: host_width,
+                                    port: port_width,
+                                    user: user_width,
+                                }),
+                            },
                         );
-                        ui.add(
-                            egui::Label::new(
-                                egui::RichText::new(&session.host)
-                                    .size(UI_META_SIZE)
-                                    .color(if muted { palette.muted } else { palette.accent }),
-                            )
-                            .truncate(),
-                        );
-                        ui.separator();
-                        ui.label(
-                            egui::RichText::new(text.col_user)
-                                .size(UI_META_SIZE)
-                                .color(palette.muted),
-                        );
-                        ui.add(
-                            egui::Label::new(
-                                egui::RichText::new(&session.username)
-                                    .size(UI_META_SIZE)
-                                    .color(content_color),
-                            )
-                            .truncate(),
-                        );
-                    });
-                });
-
+                    },
+                );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let enabled = session.password_status == PasswordStatus::Available;
                     clicked = ui
                         .add_enabled_ui(enabled, |ui| {
                             if muted {
-                                theme::subdued_secondary_button(ui, button_text)
+                                theme::subdued_secondary_button_sized(ui, button_text, action_size)
                             } else {
-                                theme::secondary_button(ui, button_text)
+                                theme::secondary_button_sized(ui, button_text, action_size)
                             }
                         })
                         .inner
@@ -693,35 +705,145 @@ fn render_session_row(
                         theme::password_frame(ui)
                     };
                     password_frame.show(ui, |ui| {
-                        ui.set_min_width(UI_PASSWORD_AREA_WIDTH);
-                        ui.vertical(|ui| {
-                            ui.label(
-                                egui::RichText::new(text.col_password)
-                                    .size(UI_META_SIZE)
-                                    .color(palette.muted),
-                            );
-                            ui.label(
-                                egui::RichText::new(password_text)
-                                    .size(UI_SECRET_SIZE)
-                                    .monospace()
-                                    .color(
-                                        if muted
-                                            || session.password_status
-                                                == PasswordStatus::MasterPasswordProtected
-                                        {
-                                            palette.muted
-                                        } else {
-                                            palette.text
-                                        },
-                                    ),
-                            );
-                        });
+                        ui.set_width(UI_PASSWORD_AREA_WIDTH);
+                        ui.label(
+                            egui::RichText::new(password_text)
+                                .size(UI_SECRET_SIZE)
+                                .monospace()
+                                .color(
+                                    if muted
+                                        || session.password_status
+                                            == PasswordStatus::MasterPasswordProtected
+                                    {
+                                        palette.muted
+                                    } else {
+                                        palette.text
+                                    },
+                                ),
+                        );
                     });
                 });
             });
         });
+        let _ = row.response.on_hover_ui(|ui| {
+            ui.horizontal(|ui| {
+                add_session_fields(
+                    ui,
+                    &SessionIdentity {
+                        name: &session.name,
+                        protocol: session.connection.label(),
+                        host,
+                        port: &port,
+                        user: username,
+                        content_color,
+                        protocol_color,
+                        widths: None,
+                    },
+                );
+            });
+        });
     });
     clicked
+}
+
+#[derive(Clone, Copy)]
+struct IdentityWidths {
+    name: f32,
+    protocol: f32,
+    host: f32,
+    port: f32,
+    user: f32,
+}
+
+struct SessionIdentity<'a> {
+    name: &'a str,
+    protocol: &'a str,
+    host: &'a str,
+    port: &'a str,
+    user: &'a str,
+    content_color: egui::Color32,
+    protocol_color: egui::Color32,
+    widths: Option<IdentityWidths>,
+}
+
+fn add_session_fields(ui: &mut egui::Ui, identity: &SessionIdentity<'_>) {
+    let widths = identity.widths;
+    add_identity_field(
+        ui,
+        identity.name,
+        UI_SESSION_TITLE_SIZE,
+        true,
+        identity.content_color,
+        widths.map(|widths| widths.name),
+    );
+    add_identity_field(
+        ui,
+        identity.protocol,
+        UI_META_SIZE,
+        true,
+        identity.protocol_color,
+        widths.map(|widths| widths.protocol),
+    );
+    add_identity_field(
+        ui,
+        identity.host,
+        UI_META_SIZE,
+        false,
+        identity.content_color,
+        widths.map(|widths| widths.host),
+    );
+    add_identity_field(
+        ui,
+        identity.port,
+        UI_META_SIZE,
+        false,
+        identity.content_color,
+        widths.map(|widths| widths.port),
+    );
+    add_identity_field(
+        ui,
+        identity.user,
+        UI_META_SIZE,
+        false,
+        identity.content_color,
+        widths.map(|widths| widths.user),
+    );
+}
+
+fn add_identity_field(
+    ui: &mut egui::Ui,
+    text: &str,
+    size: f32,
+    strong: bool,
+    color: egui::Color32,
+    width: Option<f32>,
+) {
+    let mut rich = egui::RichText::new(text).size(size).color(color);
+    if strong {
+        rich = rich.strong();
+    }
+    let mut label = egui::Label::new(rich);
+    if width.is_some() {
+        label = label.truncate();
+    }
+    if let Some(width) = width {
+        ui.add_sized([width, UI_BUTTON_HEIGHT], label);
+    } else {
+        ui.add(label);
+    }
+}
+
+fn row_action_button_size(ui: &egui::Ui, label: &str) -> egui::Vec2 {
+    let font = egui::TextStyle::Button.resolve(ui.style());
+    let text_width = ui
+        .painter()
+        .layout_no_wrap(label.to_owned(), font, egui::Color32::PLACEHOLDER)
+        .size()
+        .x;
+    egui::vec2(
+        text_width + ui.spacing().button_padding.x * 2.0,
+        UI_BUTTON_HEIGHT,
+    )
 }
 
 #[cfg(test)]
@@ -733,6 +855,8 @@ mod tests {
         Session {
             name: name.to_owned(),
             host: String::new(),
+            port: 22,
+            connection: crate::core::model::ConnectionKind::Sftp,
             username: String::new(),
             folder: folder.iter().map(|part| (*part).to_owned()).collect(),
             password: SecretString::default(),

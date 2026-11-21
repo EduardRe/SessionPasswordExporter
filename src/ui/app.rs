@@ -122,6 +122,8 @@ struct WinScpApp {
     recovery_paused: bool,
     recovery_window_open: bool,
     recovery_scope: Option<String>,
+    restored_window_size: Option<egui::Vec2>,
+    window_was_maximized: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -565,6 +567,8 @@ impl WinScpApp {
             recovery_paused: false,
             recovery_window_open: false,
             recovery_scope: None,
+            restored_window_size: None,
+            window_was_maximized: false,
         }
     }
 
@@ -1521,6 +1525,7 @@ impl eframe::App for WinScpApp {
         static FIRST_FRAME: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         FIRST_FRAME.get_or_init(|| crate::diagnostics::record("First GUI frame rendered"));
         let context = ui.ctx().clone();
+        correct_restored_window(self, &context);
         let language = resolve_language(self.settings.language);
         let text = labels(language);
         self.poll_master_password_decryption(&context);
@@ -1542,36 +1547,40 @@ impl eframe::App for WinScpApp {
             self.add_inputs(&dropped_paths, language);
         }
 
-        egui::Panel::top("header").show(ui, |ui| {
+        self.update_session_list_cache();
+        let session_count = if self.search_query.trim().is_empty() {
+            format!("{} {}", text.session_count_prefix, self.sessions.len())
+        } else {
+            format!(
+                "{} {}/{}",
+                text.session_count_prefix,
+                self.filtered_indices.len(),
+                self.sessions.len()
+            )
+        };
+        let chrome = theme::chrome_panel_frame(ui);
+
+        egui::Panel::top("header").frame(chrome).show(ui, |ui| {
             theme::card_frame(ui).show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.label(
-                            egui::RichText::new(text.header_title)
-                                .size(UI_TITLE_SIZE)
-                                .strong()
-                                .color(theme::palette(ui).text),
-                        );
-                        ui.label(
-                            egui::RichText::new(text.header_subtitle)
-                                .size(UI_META_SIZE)
-                                .color(theme::palette(ui).muted),
-                        );
-                    });
+                    ui.label(
+                        egui::RichText::new(text.header_title)
+                            .size(UI_TITLE_SIZE)
+                            .strong()
+                            .color(theme::palette(ui).text),
+                    )
+                    .on_hover_text(text.header_subtitle);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         egui::menu::MenuButton::new(text.settings)
                             .config(settings_menu_config())
                             .ui(ui, |ui| settings_menu(ui, self, text, &context));
-                        theme::badge(
-                            ui,
-                            &format!("{} {}", text.session_count_prefix, self.sessions.len()),
-                        );
+                        theme::badge(ui, &session_count);
                     });
                 });
             });
         });
 
-        egui::Panel::top("toolbar").show(ui, |ui| {
+        egui::Panel::top("toolbar").frame(chrome).show(ui, |ui| {
             theme::card_frame(ui).show(ui, |ui| {
                 if self.recovery_worker.is_some() {
                     ui.horizontal(|ui| {
@@ -1680,7 +1689,7 @@ impl eframe::App for WinScpApp {
             });
         });
 
-        egui::Panel::bottom("status").show(ui, |ui| {
+        egui::Panel::bottom("status").frame(chrome).show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
                     egui::RichText::new(UI_STATUS_INDICATOR)
@@ -1699,7 +1708,7 @@ impl eframe::App for WinScpApp {
             });
         });
 
-        egui::CentralPanel::default().show(ui, |ui| {
+        egui::CentralPanel::default().frame(chrome).show(ui, |ui| {
             if self.sessions.is_empty() {
                 ui.centered_and_justified(|ui| {
                     theme::card_frame(ui).show(ui, |ui| {
@@ -1727,7 +1736,11 @@ impl eframe::App for WinScpApp {
             }
 
             ui.horizontal(|ui| {
-                let clear_button_width = UI_BUTTON_HEIGHT + UI_LAYOUT_GAP;
+                let clear_button_width = if self.search_query.is_empty() {
+                    0.0
+                } else {
+                    UI_BUTTON_HEIGHT + UI_LAYOUT_GAP
+                };
                 let search_width = (ui.available_width() - clear_button_width).max(0.0);
                 ui.add_sized(
                     [search_width, UI_BUTTON_HEIGHT],
@@ -1742,24 +1755,6 @@ impl eframe::App for WinScpApp {
                     self.clear_search();
                 }
             });
-            ui.add_space(UI_LAYOUT_GAP);
-
-            self.update_session_list_cache();
-            ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new(text.section_sessions)
-                        .size(UI_SECTION_SIZE)
-                        .strong()
-                        .color(theme::palette(ui).text),
-                );
-                let count = if self.search_query.trim().is_empty() {
-                    format!("{}", self.sessions.len())
-                } else {
-                    format!("{}/{}", self.filtered_indices.len(), self.sessions.len())
-                };
-                theme::badge(ui, &count);
-            });
-            ui.add_space(UI_LAYOUT_GAP);
 
             let search_active = !self.search_query.trim().is_empty();
             if self.filtered_indices.is_empty()
@@ -2366,6 +2361,76 @@ fn toggle_session_visibility(
     }
 }
 
+fn correct_restored_window(app: &mut WinScpApp, ctx: &egui::Context) {
+    let (maximized, size, monitor) = ctx.input(|input| {
+        let viewport = input.viewport();
+        (
+            viewport.maximized.unwrap_or(false),
+            viewport.inner_rect.map(|rect| rect.size()),
+            viewport.monitor_size,
+        )
+    });
+    let action = restore_window_action(
+        app.window_was_maximized,
+        maximized,
+        size,
+        app.restored_window_size,
+        monitor,
+    );
+    match action {
+        RestoreWindowAction::None => {}
+        RestoreWindowAction::Repaint => ctx.request_repaint(),
+        RestoreWindowAction::Resize(size) => {
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
+            ctx.request_repaint();
+        }
+    }
+    if !maximized && size.is_some_and(|size| window_size_is_usable(size, monitor)) {
+        app.restored_window_size = size;
+    }
+    app.window_was_maximized = maximized;
+}
+
+enum RestoreWindowAction {
+    None,
+    Repaint,
+    Resize(egui::Vec2),
+}
+
+fn restore_window_action(
+    was_maximized: bool,
+    maximized: bool,
+    size: Option<egui::Vec2>,
+    last_good: Option<egui::Vec2>,
+    monitor: Option<egui::Vec2>,
+) -> RestoreWindowAction {
+    let usable = size.is_some_and(|size| window_size_is_usable(size, monitor));
+    if maximized || usable {
+        return if was_maximized && !maximized {
+            RestoreWindowAction::Repaint
+        } else {
+            RestoreWindowAction::None
+        };
+    }
+    if !was_maximized && last_good.is_none() {
+        return RestoreWindowAction::None;
+    }
+    RestoreWindowAction::Resize(last_good.unwrap_or(egui::vec2(WINDOW_WIDTH, WINDOW_HEIGHT)))
+}
+
+fn window_size_is_usable(size: egui::Vec2, monitor: Option<egui::Vec2>) -> bool {
+    if size.x + 1.0 < MIN_WINDOW_WIDTH || size.y + 1.0 < MIN_WINDOW_HEIGHT {
+        return false;
+    }
+    if let Some(monitor) = monitor
+        && size.x > monitor.x - 32.0
+        && size.y > monitor.y - 80.0
+    {
+        return false;
+    }
+    true
+}
+
 fn export_format_label(format: ExportFormat, text: &Labels) -> &'static str {
     match format {
         ExportFormat::Text => text.format_text,
@@ -2388,11 +2453,16 @@ fn filter_session_indices(
             if exclude_collapsed && session_is_in_collapsed_node(session, collapsed_nodes) {
                 return None;
             }
+            let port = session.port.to_string();
+            let endpoint = session.endpoint();
             let matches = query.is_empty()
                 || [
                     session.name.as_str(),
                     session.host.as_str(),
                     session.username.as_str(),
+                    session.connection.label(),
+                    port.as_str(),
+                    endpoint.as_str(),
                 ]
                 .iter()
                 .any(|field| field.to_lowercase().contains(&query));
@@ -2434,6 +2504,8 @@ mod tests {
         Session {
             name: name.to_owned(),
             host: host.to_owned(),
+            port: 22,
+            connection: crate::core::model::ConnectionKind::Sftp,
             username: username.to_owned(),
             folder: Vec::new(),
             password: SecretString::default(),
@@ -2609,6 +2681,59 @@ mod tests {
     }
 
     #[test]
+    fn restoring_a_maximized_window_repaints_a_usable_size_and_replaces_a_broken_one() {
+        let monitor = Some(egui::vec2(1920.0, 1080.0));
+        let normal = egui::vec2(WINDOW_WIDTH, WINDOW_HEIGHT);
+        let tiny = egui::vec2(180.0, 40.0);
+        let maximized_size = egui::vec2(1900.0, 1040.0);
+
+        assert!(matches!(
+            restore_window_action(true, false, Some(normal), Some(normal), monitor),
+            RestoreWindowAction::Repaint
+        ));
+        match restore_window_action(true, false, Some(tiny), Some(normal), monitor) {
+            RestoreWindowAction::Resize(size) => assert_eq!(size, normal),
+            RestoreWindowAction::None | RestoreWindowAction::Repaint => {
+                panic!("a tiny restored window must be resized")
+            }
+        }
+        match restore_window_action(true, false, Some(maximized_size), Some(normal), monitor) {
+            RestoreWindowAction::Resize(size) => assert_eq!(size, normal),
+            RestoreWindowAction::None | RestoreWindowAction::Repaint => {
+                panic!("a still-maximized client size must be restored")
+            }
+        }
+        match restore_window_action(false, false, Some(tiny), Some(normal), monitor) {
+            RestoreWindowAction::Resize(size) => assert_eq!(size, normal),
+            RestoreWindowAction::None | RestoreWindowAction::Repaint => {
+                panic!("a stuck tiny window must return to the last good size")
+            }
+        }
+        assert!(matches!(
+            restore_window_action(false, false, Some(tiny), None, monitor),
+            RestoreWindowAction::None
+        ));
+        assert!(window_size_is_usable(normal, monitor));
+        assert!(!window_size_is_usable(tiny, monitor));
+    }
+
+    #[test]
+    fn search_matches_port_and_connection_type() {
+        let mut sessions = [
+            search_session("Alpha", "10.0.0.1", "root"),
+            search_session("Files", "files.example.test", "backup"),
+        ];
+        sessions[0].connection = crate::core::model::ConnectionKind::Scp;
+        sessions[1].port = 2121;
+        sessions[1].connection = crate::core::model::ConnectionKind::Ftp;
+
+        assert_eq!(filter(&sessions, "2121"), [1]);
+        assert_eq!(filter(&sessions, "ftp"), [1]);
+        assert_eq!(filter(&sessions, "scp"), [0]);
+        assert_eq!(filter(&sessions, "files.example.test:2121"), [1]);
+    }
+
+    #[test]
     fn empty_search_returns_all_sessions_and_unmatched_search_returns_none() {
         let sessions = [
             search_session("Alpha", "10.0.0.1", "root"),
@@ -2680,6 +2805,8 @@ mod tests {
             recovery_paused: false,
             recovery_window_open: false,
             recovery_scope: None,
+            restored_window_size: None,
+            window_was_maximized: false,
         };
 
         app.clear_session_list(Language::Russian);
@@ -2791,6 +2918,8 @@ mod tests {
             recovery_paused: false,
             recovery_window_open: false,
             recovery_scope: None,
+            restored_window_size: None,
+            window_was_maximized: false,
         };
         let context = egui::Context::default();
 

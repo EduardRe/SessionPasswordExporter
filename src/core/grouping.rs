@@ -99,6 +99,8 @@ mod tests {
         Session {
             name: "session".to_owned(),
             host: String::new(),
+            port: 22,
+            connection: crate::core::model::ConnectionKind::Sftp,
             username: String::new(),
             folder: Vec::new(),
             password: SecretString::default(),

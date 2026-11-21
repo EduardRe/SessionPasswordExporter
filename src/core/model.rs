@@ -115,10 +115,89 @@ impl Drop for SecretString {
     }
 }
 
+/// File protocol stored by WinSCP.
+///
+/// `FSProtocol`: `0` SCP, `1` SFTP with SCP fallback, `2` SFTP, `5` FTP,
+/// `6` WebDAV, `7` S3. Values `3` and `4` are obsolete gaps.
+/// `Ftps`: `0` none, `1` implicit TLS, `2` explicit SSL, `3` explicit TLS.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ConnectionKind {
+    Scp,
+    #[default]
+    Sftp,
+    Ftp,
+    Ftps,
+    Ftpes,
+    WebDav,
+    WebDavs,
+    S3,
+    Unknown,
+}
+
+impl ConnectionKind {
+    pub fn from_winscp(fs_protocol: Option<u32>, ftps: u32) -> Self {
+        match fs_protocol {
+            None | Some(1 | 2) => Self::Sftp,
+            Some(0) => Self::Scp,
+            Some(5) => match ftps {
+                0 => Self::Ftp,
+                1 => Self::Ftps,
+                _ => Self::Ftpes,
+            },
+            Some(6) if ftps == 0 => Self::WebDav,
+            Some(6) => Self::WebDavs,
+            Some(7) => Self::S3,
+            Some(_) => Self::Unknown,
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Scp => "SCP",
+            Self::Sftp => "SFTP",
+            Self::Ftp => "FTP",
+            Self::Ftps => "FTPS",
+            Self::Ftpes => "FTPES",
+            Self::WebDav => "WebDAV",
+            Self::WebDavs => "WebDAVS",
+            Self::S3 => "S3",
+            Self::Unknown => "?",
+        }
+    }
+
+    /// WinSCP `DefaultPort`: SSH 22, FTP 21, implicit FTPS 990, HTTP 80, HTTPS 443.
+    pub const fn default_port(self, ftps: u32) -> u16 {
+        match self {
+            Self::Scp | Self::Sftp | Self::Unknown => 22,
+            Self::Ftp | Self::Ftpes => 21,
+            Self::Ftps => 990,
+            Self::WebDav => 80,
+            Self::WebDavs => 443,
+            Self::S3 => {
+                if ftps == 0 {
+                    80
+                } else {
+                    443
+                }
+            }
+        }
+    }
+}
+
+/// Uses an explicit port in `1..=65535`. Missing and `0` fall back to the protocol default.
+pub fn resolve_port(kind: ConnectionKind, ftps: u32, stored_port: Option<u32>) -> u16 {
+    match stored_port {
+        Some(port) if (1..=65_535).contains(&port) => port as u16,
+        _ => kind.default_port(ftps),
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Session {
     pub name: String,
     pub host: String,
+    pub port: u16,
+    pub connection: ConnectionKind,
     pub username: String,
     pub folder: Vec<String>,
     pub password: SecretString,
@@ -126,6 +205,16 @@ pub struct Session {
     pub master_password_verifier: Option<SecretString>,
     pub password_status: PasswordStatus,
     pub source: String,
+}
+
+impl Session {
+    pub fn endpoint(&self) -> String {
+        if self.host.is_empty() {
+            self.port.to_string()
+        } else {
+            format!("{}:{}", self.host, self.port)
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]

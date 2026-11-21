@@ -1,12 +1,14 @@
 use std::collections::BTreeMap;
 
 use crate::config::constants::{
-    INI_HOST_NAME, INI_MASTER_PASSWORD_VERIFIER, INI_PASSWORD, INI_SECURITY_SECTION,
-    INI_SESSION_NAME, INI_SESSIONS_PREFIX, INI_USE_MASTER_PASSWORD, INI_USER_NAME,
-    REGISTRY_DEFAULT_SETTINGS,
+    INI_FS_PROTOCOL, INI_FTPS, INI_HOST_NAME, INI_MASTER_PASSWORD_VERIFIER, INI_PASSWORD,
+    INI_PORT_NUMBER, INI_SECURITY_SECTION, INI_SESSION_NAME, INI_SESSIONS_PREFIX,
+    INI_USE_MASTER_PASSWORD, INI_USER_NAME, REGISTRY_DEFAULT_SETTINGS,
 };
 use crate::core::crypto::decrypt_password;
-use crate::core::model::{ImportReport, PasswordStatus, SecretString, Session};
+use crate::core::model::{
+    ConnectionKind, ImportReport, PasswordStatus, SecretString, Session, resolve_port,
+};
 
 #[derive(Clone, Default)]
 pub struct MasterPasswordConfig {
@@ -67,12 +69,15 @@ pub fn parse_ini_text(contents: &str, source: &str) -> ImportReport {
             .map(|value| percent_decode(value))
             .unwrap_or_default();
         let encrypted_password = values.get(INI_PASSWORD).map(|value| percent_decode(value));
+        let (connection, port) = read_connection(&values);
         let folder = parts[..parts.len().saturating_sub(1)].to_vec();
 
         report.sessions.push(session_from_values(
             name,
             folder,
             host,
+            port,
+            connection,
             username,
             encrypted_password,
             master_password.clone(),
@@ -82,10 +87,32 @@ pub fn parse_ini_text(contents: &str, source: &str) -> ImportReport {
     report
 }
 
+pub fn read_connection(values: &BTreeMap<String, String>) -> (ConnectionKind, u16) {
+    let protocol = values
+        .get(INI_FS_PROTOCOL)
+        .and_then(|value| parse_integer(value));
+    let ftps = values
+        .get(INI_FTPS)
+        .and_then(|value| parse_integer(value))
+        .unwrap_or(0);
+    let stored_port = values
+        .get(INI_PORT_NUMBER)
+        .and_then(|value| parse_integer(value));
+    let connection = ConnectionKind::from_winscp(protocol, ftps);
+    (connection, resolve_port(connection, ftps, stored_port))
+}
+
+fn parse_integer(value: &str) -> Option<u32> {
+    value.trim().parse().ok()
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn session_from_values(
     name: String,
     folder: Vec<String>,
     host: String,
+    port: u16,
+    connection: ConnectionKind,
     username: String,
     encrypted_password: Option<String>,
     master_password: MasterPasswordConfig,
@@ -120,6 +147,8 @@ pub fn session_from_values(
     Session {
         name,
         host,
+        port,
+        connection,
         username,
         folder,
         password: SecretString::new(password),
@@ -238,7 +267,7 @@ fn hex_nibble(value: u8) -> Option<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::model::PasswordStatus;
+    use crate::core::model::{ConnectionKind, PasswordStatus};
 
     const BASIC_INI: &str =
         "[Sessions\\Team\\Production]\nHostName=prod.example.test\nUserName=deploy\n";
@@ -254,10 +283,55 @@ mod tests {
         assert_eq!(report.sessions[0].folder, ["Team"]);
         assert_eq!(report.sessions[0].host, "prod.example.test");
         assert_eq!(report.sessions[0].username, "deploy");
+        assert_eq!(report.sessions[0].connection, ConnectionKind::Sftp);
+        assert_eq!(report.sessions[0].port, 22);
         assert_eq!(
             report.sessions[0].password_status,
             PasswordStatus::NotStored
         );
+    }
+
+    #[test]
+    fn reads_protocol_and_port_using_winscp_defaults() {
+        let ini = "\
+[Sessions\\Scp]\nHostName=scp.example.test\nFSProtocol=0\n\
+[Sessions\\Ftp]\nHostName=ftp.example.test\nFSProtocol=5\nPortNumber=2121\n\
+[Sessions\\FtpDefault]\nHostName=ftp-default.example.test\nFSProtocol=5\n\
+[Sessions\\Ftps]\nHostName=ftps.example.test\nFSProtocol=5\nFtps=1\n\
+[Sessions\\Ftpes]\nHostName=ftpes.example.test\nFSProtocol=5\nFtps=3\n\
+[Sessions\\Dav]\nHostName=dav.example.test\nFSProtocol=6\n\
+[Sessions\\Davs]\nHostName=davs.example.test\nFSProtocol=6\nFtps=1\nPortNumber=8443\n\
+[Sessions\\Bucket]\nHostName=s3.example.test\nFSProtocol=7\nFtps=1\n\
+[Sessions\\CustomSftp]\nHostName=only.example.test\nFSProtocol=2\nPortNumber=2222\n\
+[Sessions\\IgnoredPort]\nHostName=zero.example.test\nFSProtocol=5\nPortNumber=0\n";
+        let report = parse_ini_text(ini, "protocols.ini");
+        let session = |name: &str| {
+            report
+                .sessions
+                .iter()
+                .find(|session| session.name == name)
+                .unwrap_or_else(|| panic!("missing {name}"))
+        };
+
+        assert_eq!(session("Scp").connection, ConnectionKind::Scp);
+        assert_eq!(session("Scp").port, 22);
+        assert_eq!(session("Ftp").connection, ConnectionKind::Ftp);
+        assert_eq!(session("Ftp").port, 2121);
+        assert_eq!(session("FtpDefault").connection, ConnectionKind::Ftp);
+        assert_eq!(session("FtpDefault").port, 21);
+        assert_eq!(session("Ftps").connection, ConnectionKind::Ftps);
+        assert_eq!(session("Ftps").port, 990);
+        assert_eq!(session("Ftpes").connection, ConnectionKind::Ftpes);
+        assert_eq!(session("Ftpes").port, 21);
+        assert_eq!(session("Dav").connection, ConnectionKind::WebDav);
+        assert_eq!(session("Dav").port, 80);
+        assert_eq!(session("Davs").connection, ConnectionKind::WebDavs);
+        assert_eq!(session("Davs").port, 8443);
+        assert_eq!(session("Bucket").connection, ConnectionKind::S3);
+        assert_eq!(session("Bucket").port, 443);
+        assert_eq!(session("CustomSftp").connection, ConnectionKind::Sftp);
+        assert_eq!(session("CustomSftp").port, 2222);
+        assert_eq!(session("IgnoredPort").port, 21);
     }
 
     #[test]

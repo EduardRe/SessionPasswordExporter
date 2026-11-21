@@ -82,7 +82,7 @@ pub fn palette(ui: &egui::Ui) -> Palette {
 
 fn configure_style(context: &egui::Context, theme: egui::Theme, palette: Palette) {
     context.style_mut_of(theme, |style| {
-        style.spacing.item_spacing = egui::vec2(UI_LAYOUT_GAP, UI_LAYOUT_GAP);
+        style.spacing.item_spacing = egui::vec2(UI_LAYOUT_GAP, UI_ROW_GAP);
         style.spacing.window_margin = egui::Margin::same(UI_CARD_PADDING);
         style.spacing.button_padding = egui::vec2(UI_LAYOUT_GAP, UI_COMPACT_PADDING as f32);
         style.spacing.interact_size.y = UI_BUTTON_HEIGHT;
@@ -135,19 +135,29 @@ fn color(rgb: [u8; 3]) -> egui::Color32 {
     egui::Color32::from_rgb(rgb[0], rgb[1], rgb[2])
 }
 
+pub fn chrome_panel_frame(ui: &egui::Ui) -> egui::Frame {
+    egui::Frame::new()
+        .inner_margin(egui::Margin::symmetric(6, 3))
+        .fill(palette(ui).background)
+}
+
+pub fn list_row_frame(ui: &egui::Ui, muted: bool) -> egui::Frame {
+    let palette = palette(ui);
+    egui::Frame::new()
+        .fill(if muted {
+            palette.background
+        } else {
+            palette.surface
+        })
+        .stroke(egui::Stroke::new(UI_BORDER_WIDTH, palette.border))
+        .corner_radius(egui::CornerRadius::same(UI_CONTROL_RADIUS))
+        .inner_margin(egui::Margin::symmetric(8, 3))
+}
+
 pub fn card_frame(ui: &egui::Ui) -> egui::Frame {
     let palette = palette(ui);
     egui::Frame::new()
         .fill(palette.surface)
-        .stroke(egui::Stroke::new(UI_BORDER_WIDTH, palette.border))
-        .corner_radius(egui::CornerRadius::same(UI_CARD_RADIUS))
-        .inner_margin(egui::Margin::same(UI_CARD_PADDING))
-}
-
-pub fn subdued_card_frame(ui: &egui::Ui) -> egui::Frame {
-    let palette = palette(ui);
-    egui::Frame::new()
-        .fill(palette.background)
         .stroke(egui::Stroke::new(UI_BORDER_WIDTH, palette.border))
         .corner_radius(egui::CornerRadius::same(UI_CARD_RADIUS))
         .inner_margin(egui::Margin::same(UI_CARD_PADDING))
@@ -220,14 +230,18 @@ pub fn secondary_button_sized(ui: &mut egui::Ui, label: &str, size: egui::Vec2) 
     )
 }
 
-pub fn subdued_secondary_button(ui: &mut egui::Ui, label: &str) -> egui::Response {
+pub fn subdued_secondary_button_sized(
+    ui: &mut egui::Ui,
+    label: &str,
+    size: egui::Vec2,
+) -> egui::Response {
     let palette = palette(ui);
     ui.add(
         egui::Button::new(egui::RichText::new(label).color(palette.muted))
             .fill(palette.background)
             .stroke(egui::Stroke::new(UI_BORDER_WIDTH, palette.border))
             .corner_radius(egui::CornerRadius::same(UI_CONTROL_RADIUS))
-            .min_size(egui::vec2(0.0, UI_BUTTON_HEIGHT)),
+            .min_size(size),
     )
 }
 

@@ -42,6 +42,7 @@ fn export_text_session(session: &Session, language: Language) -> String {
         ));
     }
     lines.push(format!("{}: {}", text.text_host, session.host));
+    lines.push(format!("{}: {}", text.text_port, session.port));
     lines.push(format!("{}: {}", text.text_user, session.username));
     let password = if session.password_status == crate::core::model::PasswordStatus::Available {
         session.password.as_str()
@@ -58,6 +59,7 @@ struct ExportedSession<'a> {
     name: &'a str,
     folder: &'a [String],
     host: &'a str,
+    port: u16,
     username: &'a str,
     password: Option<&'a str>,
     password_status: &'static str,
@@ -92,6 +94,7 @@ fn export_json_session(session: &Session) -> ExportedSession<'_> {
         name: &session.name,
         folder: &session.folder,
         host: &session.host,
+        port: session.port,
         username: &session.username,
         password: (session.password_status == crate::core::model::PasswordStatus::Available)
             .then_some(session.password.as_str()),
@@ -132,6 +135,7 @@ fn append_xml_session(output: &mut String, session: &Session, indent: usize) {
     output.extend(std::iter::repeat_n(' ', indent + 2));
     output.push_str("</folders>");
     append_xml_element(output, "host", &session.host, indent + 2);
+    append_xml_element(output, "port", &session.port.to_string(), indent + 2);
     append_xml_element(output, "username", &session.username, indent + 2);
     let password = if session.password_status == crate::core::model::PasswordStatus::Available {
         session.password.as_str()
@@ -197,6 +201,8 @@ mod tests {
         Session {
             name: "Production & <Blue>".to_owned(),
             host: "host.example.test".to_owned(),
+            port: 2222,
+            connection: crate::core::model::ConnectionKind::Sftp,
             username: "alice".to_owned(),
             folder: vec!["Team".to_owned(), "Servers".to_owned()],
             password: SecretString::new("secret<&\"'".to_owned()),
@@ -216,7 +222,9 @@ mod tests {
         assert!(english.starts_with("Source: sample"));
         assert!(russian.contains("Подключение: Production & <Blue>"));
         assert!(russian.contains("Папка: Team/Servers"));
+        assert!(russian.contains("Порт: 2222"));
         assert!(english.contains("Session: Production & <Blue>"));
+        assert!(english.contains("Port: 2222"));
         assert!(english.contains("Password: secret<&\"'"));
     }
 
@@ -227,6 +235,7 @@ mod tests {
         assert_eq!(parsed[0]["name"], "sample");
         assert_eq!(parsed[0]["source"], "sample.ini");
         assert_eq!(parsed[0]["sessions"][0]["password"], "secret<&\"'");
+        assert_eq!(parsed[0]["sessions"][0]["port"], 2222);
         assert_eq!(parsed[0]["sessions"][0]["folder"][1], "Servers");
         assert_eq!(parsed[0]["sessions"][0]["password_status"], "available");
     }
@@ -237,6 +246,7 @@ mod tests {
         assert!(output.contains("<source_group name=\"sample\" source=\"sample.ini\">"));
         assert!(output.contains("Production &amp; &lt;Blue&gt;"));
         assert!(output.contains("secret&lt;&amp;&quot;&apos;"));
+        assert!(output.contains("<port>2222</port>"));
         assert!(output.contains("<password status=\"available\">"));
     }
 

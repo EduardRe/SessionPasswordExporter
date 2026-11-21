@@ -81,6 +81,8 @@ mod tests {
         Session {
             name: name.to_owned(),
             host: "host.example.test".to_owned(),
+            port: 22,
+            connection: crate::core::model::ConnectionKind::Sftp,
             username: "admin".to_owned(),
             folder: Vec::new(),
             password: SecretString::default(),
