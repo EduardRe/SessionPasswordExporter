@@ -21,15 +21,15 @@ use crate::config::constants::{
     STATUS_OUTPUT_WRITE_FAILED, STATUS_SETTINGS_WRITE_FAILED, UI_ABOUT_WINDOW_WIDTH,
     UI_BUTTON_HEIGHT, UI_ID_ABOUT_DETAILS, UI_ID_ABOUT_WINDOW, UI_ID_MASTER_PASSWORD_RESULT_WINDOW,
     UI_ID_MASTER_PASSWORD_WINDOW, UI_ID_PARTIAL_EXPORT_WINDOW, UI_ID_RECOVERY_WINDOW,
-    UI_LAYOUT_GAP, UI_MASTER_PASSWORD_WINDOW_WIDTH, UI_MENU_BUTTON_PADDING_X,
+    UI_ID_UPDATE_WINDOW, UI_LAYOUT_GAP, UI_MASTER_PASSWORD_WINDOW_WIDTH, UI_MENU_BUTTON_PADDING_X,
     UI_MENU_BUTTON_PADDING_Y, UI_MENU_ITEM_GAP_X, UI_MENU_ITEM_GAP_Y, UI_MENU_ITEM_HEIGHT,
     UI_MENU_MARGIN, UI_MENU_SUBMENU_GAP, UI_META_SIZE, UI_RECOVERY_LIST_MAX_HEIGHT,
     UI_RECOVERY_SOURCE_ROW_HEIGHT, UI_SECTION_SIZE, UI_SETTINGS_SUBMENU_MIN_WIDTH,
-    UI_SETTINGS_SWITCH_MENU_MIN_WIDTH, UI_STATUS_INDICATOR, UI_TITLE_SIZE, WINDOW_HEIGHT,
-    WINDOW_WIDTH,
+    UI_SETTINGS_SWITCH_MENU_MIN_WIDTH, UI_STATUS_INDICATOR, UI_TITLE_SIZE, UI_UPDATE_WINDOW_WIDTH,
+    WINDOW_HEIGHT, WINDOW_WIDTH,
 };
 use crate::config::localization::{Labels, Language, labels, resolve_language};
-use crate::config::settings::{load_settings, save_settings};
+use crate::config::settings::{is_portable, load_settings, save_settings};
 use crate::core::export::export_sessions;
 use crate::core::input::load_ini_inputs;
 use crate::core::master_password::{protected_sources, unlock_protected_source};
@@ -42,6 +42,10 @@ use crate::core::recovery::{
     load_checkpoint, save_checkpoint, source_fingerprint,
 };
 use crate::core::registry::load_registry_sessions;
+use crate::core::update::{
+    AvailableUpdate, PreparedUpdate, UpdateError, UpdateKind, Version, check_for_update,
+    current_architecture, download_update, launch_update,
+};
 
 pub fn run() -> eframe::Result {
     crate::diagnostics::record("Preparing GUI window and graphics backend");
@@ -86,6 +90,16 @@ fn configure_windows_wgpu_backends(
     native_options
 }
 
+enum UpdatePhase {
+    Idle,
+    Checking,
+    UpToDate,
+    Available(AvailableUpdate),
+    CheckFailed,
+    Downloading,
+    DownloadFailed,
+}
+
 struct WinScpApp {
     sessions: Vec<Session>,
     settings: Settings,
@@ -102,6 +116,12 @@ struct WinScpApp {
     collapsed_nodes: HashSet<CollapsibleNodeId>,
     status: String,
     about_open: bool,
+    update_dialog_open: bool,
+    update_manual: bool,
+    update_autostarted: bool,
+    update_phase: UpdatePhase,
+    update_check_receiver: Option<Receiver<Result<Option<AvailableUpdate>, UpdateError>>>,
+    update_download_receiver: Option<Receiver<Result<PreparedUpdate, UpdateError>>>,
     master_passwords: HashMap<String, SecretString>,
     master_password_open: bool,
     master_password_source: Option<String>,
@@ -547,6 +567,12 @@ impl WinScpApp {
             collapsed_nodes: HashSet::new(),
             status,
             about_open: false,
+            update_dialog_open: false,
+            update_manual: false,
+            update_autostarted: false,
+            update_phase: UpdatePhase::Idle,
+            update_check_receiver: None,
+            update_download_receiver: None,
             master_passwords: HashMap::new(),
             master_password_open: false,
             master_password_source: None,
@@ -1518,6 +1544,194 @@ impl WinScpApp {
         self.cached_collapsed_nodes
             .clone_from(&self.collapsed_nodes);
     }
+
+    fn start_update_check(&mut self, manual: bool) {
+        if self.update_check_receiver.is_some() || self.update_download_receiver.is_some() {
+            if manual {
+                self.update_manual = true;
+                self.update_dialog_open = true;
+            }
+            return;
+        }
+        self.update_manual = manual;
+        self.update_phase = UpdatePhase::Checking;
+        if manual {
+            self.update_dialog_open = true;
+        }
+        let (sender, receiver) = mpsc::channel();
+        self.update_check_receiver = Some(receiver);
+        let current = Version::current();
+        let kind = if is_portable() {
+            UpdateKind::Portable
+        } else {
+            UpdateKind::Installer
+        };
+        let architecture = current_architecture().to_owned();
+        std::thread::spawn(move || {
+            let _ = sender.send(check_for_update(current, kind, &architecture));
+        });
+    }
+
+    fn start_update_download(&mut self, update: AvailableUpdate) {
+        if self.update_download_receiver.is_some() {
+            return;
+        }
+        self.update_phase = UpdatePhase::Downloading;
+        self.update_dialog_open = true;
+        let (sender, receiver) = mpsc::channel();
+        self.update_download_receiver = Some(receiver);
+        std::thread::spawn(move || {
+            let _ = sender.send(download_update(&update));
+        });
+    }
+
+    fn poll_update_check(&mut self, context: &egui::Context) {
+        if !self.update_autostarted {
+            self.update_autostarted = true;
+            self.start_update_check(false);
+        }
+
+        let finished_check =
+            self.update_check_receiver
+                .as_ref()
+                .and_then(|receiver| match receiver.try_recv() {
+                    Ok(result) => Some(result),
+                    Err(TryRecvError::Empty) => {
+                        context.request_repaint_after(Duration::from_millis(200));
+                        None
+                    }
+                    Err(TryRecvError::Disconnected) => Some(Err(UpdateError::Network)),
+                });
+        if finished_check.is_some() {
+            self.update_check_receiver = None;
+        }
+        if let Some(result) = finished_check {
+            match result {
+                Ok(Some(update)) => {
+                    self.update_phase = UpdatePhase::Available(update);
+                    self.update_dialog_open = true;
+                }
+                Ok(None) => {
+                    self.update_phase = UpdatePhase::UpToDate;
+                    self.update_dialog_open = self.update_manual;
+                }
+                Err(_error) => {
+                    self.update_phase = UpdatePhase::CheckFailed;
+                    self.update_dialog_open = self.update_manual;
+                }
+            }
+        }
+
+        let finished_download =
+            self.update_download_receiver
+                .as_ref()
+                .and_then(|receiver| match receiver.try_recv() {
+                    Ok(result) => Some(result),
+                    Err(TryRecvError::Empty) => {
+                        context.request_repaint_after(Duration::from_millis(200));
+                        None
+                    }
+                    Err(TryRecvError::Disconnected) => Some(Err(UpdateError::Network)),
+                });
+        if finished_download.is_some() {
+            self.update_download_receiver = None;
+        }
+        if let Some(result) = finished_download {
+            match result {
+                Ok(prepared) if self.update_dialog_open => {
+                    if launch_update(&prepared).is_err() {
+                        self.update_phase = UpdatePhase::DownloadFailed;
+                    } else {
+                        std::process::exit(0);
+                    }
+                }
+                Ok(_) => self.update_phase = UpdatePhase::Idle,
+                Err(_error) => {
+                    self.update_phase = UpdatePhase::DownloadFailed;
+                    self.update_dialog_open = true;
+                }
+            }
+        }
+    }
+
+    fn show_update_dialog(&mut self, parent: &egui::Ui, context: &egui::Context, text: &Labels) {
+        if !self.update_dialog_open {
+            return;
+        }
+        let mut open = self.update_dialog_open;
+        let mut dismiss = false;
+        let mut download = None;
+        egui::Window::new(text.update_title)
+            .id(parent.scope_id().with(UI_ID_UPDATE_WINDOW))
+            .default_width(UI_UPDATE_WINDOW_WIDTH)
+            .default_pos(context.content_rect().center())
+            .pivot(egui::Align2::CENTER_CENTER)
+            .collapsible(false)
+            .resizable(false)
+            .open(&mut open)
+            .show(context, |ui| {
+                let busy = matches!(
+                    self.update_phase,
+                    UpdatePhase::Checking | UpdatePhase::Downloading
+                );
+                if busy {
+                    ui.horizontal(|ui| {
+                        ui.add(egui::Spinner::new().color(theme::palette(ui).accent));
+                        let label = match self.update_phase {
+                            UpdatePhase::Downloading => text.update_downloading,
+                            _ => text.update_checking,
+                        };
+                        ui.label(label);
+                    });
+                    return;
+                }
+                match &self.update_phase {
+                    UpdatePhase::Available(update) => {
+                        ui.label(format!("{} {}", text.update_available, update.version));
+                        ui.label(format!("{}: {APP_VERSION}", text.update_current));
+                        ui.label(match update.kind {
+                            UpdateKind::Installer => text.update_installer_note,
+                            UpdateKind::Portable => text.update_portable_note,
+                        });
+                        ui.add_space(UI_LAYOUT_GAP);
+                        ui.horizontal(|ui| {
+                            if theme::primary_button(ui, text.update_download).clicked() {
+                                download = Some(update.clone());
+                            }
+                            if theme::secondary_button(ui, text.update_later).clicked() {
+                                dismiss = true;
+                            }
+                        });
+                    }
+                    UpdatePhase::UpToDate => {
+                        ui.label(format!("{} ({APP_VERSION})", text.update_up_to_date));
+                        if theme::secondary_button(ui, text.update_close).clicked() {
+                            dismiss = true;
+                        }
+                    }
+                    UpdatePhase::CheckFailed => {
+                        ui.label(text.update_check_failed);
+                        if theme::secondary_button(ui, text.update_close).clicked() {
+                            dismiss = true;
+                        }
+                    }
+                    UpdatePhase::DownloadFailed => {
+                        ui.label(text.update_download_failed);
+                        if theme::secondary_button(ui, text.update_close).clicked() {
+                            dismiss = true;
+                        }
+                    }
+                    UpdatePhase::Idle | UpdatePhase::Checking | UpdatePhase::Downloading => {}
+                }
+            });
+        if dismiss {
+            open = false;
+        }
+        self.update_dialog_open = open;
+        if let Some(update) = download {
+            self.start_update_download(update);
+        }
+    }
 }
 
 impl eframe::App for WinScpApp {
@@ -1526,6 +1740,7 @@ impl eframe::App for WinScpApp {
         FIRST_FRAME.get_or_init(|| crate::diagnostics::record("First GUI frame rendered"));
         let context = ui.ctx().clone();
         correct_restored_window(self, &context);
+        self.poll_update_check(&context);
         let language = resolve_language(self.settings.language);
         let text = labels(language);
         self.poll_master_password_decryption(&context);
@@ -1832,6 +2047,7 @@ impl eframe::App for WinScpApp {
                 .show(&context, |ui| about_window(ui, text));
         }
         self.about_open = about_open;
+        self.show_update_dialog(ui, &context, text);
 
         let mut password_window_open = self.master_password_open;
         let mut start_decryption = false;
@@ -2260,6 +2476,10 @@ fn settings_menu(ui: &mut egui::Ui, app: &mut WinScpApp, text: &Labels, context:
     }
 
     ui.separator();
+    if ui.button(text.check_updates).clicked() {
+        app.start_update_check(true);
+        ui.close();
+    }
     if ui.button(text.about).clicked() {
         app.about_open = true;
         ui.close();
@@ -2785,6 +3005,12 @@ mod tests {
             collapsed_nodes: HashSet::from([CollapsibleNodeId::Source("source.ini".to_owned())]),
             status: String::new(),
             about_open: false,
+            update_dialog_open: false,
+            update_manual: false,
+            update_autostarted: false,
+            update_phase: UpdatePhase::Idle,
+            update_check_receiver: None,
+            update_download_receiver: None,
             master_passwords: HashMap::new(),
             master_password_open: false,
             master_password_source: None,
@@ -2898,6 +3124,12 @@ mod tests {
             collapsed_nodes: HashSet::new(),
             status: String::new(),
             about_open: false,
+            update_dialog_open: false,
+            update_manual: false,
+            update_autostarted: false,
+            update_phase: UpdatePhase::Idle,
+            update_check_receiver: None,
+            update_download_receiver: None,
             master_passwords: HashMap::new(),
             master_password_open: true,
             master_password_source: None,

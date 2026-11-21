@@ -7,3 +7,4 @@ pub mod model;
 pub mod parser;
 pub mod recovery;
 pub mod registry;
+pub mod update;

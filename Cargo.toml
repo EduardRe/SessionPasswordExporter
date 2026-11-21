@@ -1,6 +1,6 @@
 [package]
 name = "session-password-exporter"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.95"
 description = "Inspect and export sessions from WinSCP configuration files"
@@ -15,6 +15,9 @@ rfd = "0.16"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha1 = "0.10"
+sha2 = "0.10"
+ureq = "2.12"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
 sys-locale = "0.3"
 zeroize = "1"
 

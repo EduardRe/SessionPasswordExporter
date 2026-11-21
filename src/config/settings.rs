@@ -37,6 +37,13 @@ pub fn settings_path() -> PathBuf {
     portable_settings_path().unwrap_or_else(user_settings_path)
 }
 
+pub fn is_portable() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|path| portable_settings_path_for_executable(&path))
+        .is_some()
+}
+
 fn portable_settings_path() -> Option<PathBuf> {
     std::env::current_exe()
         .ok()

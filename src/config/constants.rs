@@ -178,6 +178,24 @@ pub const UI_SAVE_EXPORT: &str = "Экспортировать";
 pub const UI_CLEAR_LIST: &str = "Очистить список";
 pub const UI_SETTINGS: &str = "Настройки";
 pub const UI_ABOUT: &str = "О программе";
+pub const UI_CHECK_UPDATES: &str = "Проверить обновления";
+pub const UI_UPDATE_TITLE: &str = "Обновление";
+pub const UI_UPDATE_AVAILABLE: &str = "Доступна новая версия";
+pub const UI_UPDATE_CURRENT: &str = "Текущая версия";
+pub const UI_UPDATE_DOWNLOAD: &str = "Скачать";
+pub const UI_UPDATE_LATER: &str = "Позже";
+pub const UI_UPDATE_CLOSE: &str = "Закрыть";
+pub const UI_UPDATE_CHECKING: &str = "Проверяем обновления…";
+pub const UI_UPDATE_DOWNLOADING: &str = "Скачивание…";
+pub const UI_UPDATE_UP_TO_DATE: &str = "Установлена последняя версия";
+pub const UI_UPDATE_CHECK_FAILED: &str = "Не удалось проверить обновления";
+pub const UI_UPDATE_DOWNLOAD_FAILED: &str = "Не удалось скачать обновление";
+pub const UI_UPDATE_INSTALLER_NOTE: &str =
+    "После загрузки откроется установщик, а эта копия закроется.";
+pub const UI_UPDATE_PORTABLE_NOTE: &str =
+    "Будет заменён только файл программы. Настройки в папке data сохранятся.";
+pub const UI_UPDATE_WINDOW_WIDTH: f32 = 460.0;
+pub const UI_ID_UPDATE_WINDOW: &str = "update-window";
 pub const UI_ABOUT_AUTHOR: &str = "Автор";
 pub const UI_ABOUT_VERSION: &str = "Версия";
 pub const UI_ABOUT_REPOSITORY: &str = "Репозиторий";
@@ -318,6 +336,22 @@ pub const EN_UI_SAVE_EXPORT: &str = "Export";
 pub const EN_UI_CLEAR_LIST: &str = "Clear list";
 pub const EN_UI_SETTINGS: &str = "Settings";
 pub const EN_UI_ABOUT: &str = "About";
+pub const EN_UI_CHECK_UPDATES: &str = "Check for updates";
+pub const EN_UI_UPDATE_TITLE: &str = "Update";
+pub const EN_UI_UPDATE_AVAILABLE: &str = "A new version is available";
+pub const EN_UI_UPDATE_CURRENT: &str = "Current version";
+pub const EN_UI_UPDATE_DOWNLOAD: &str = "Download";
+pub const EN_UI_UPDATE_LATER: &str = "Later";
+pub const EN_UI_UPDATE_CLOSE: &str = "Close";
+pub const EN_UI_UPDATE_CHECKING: &str = "Checking for updates…";
+pub const EN_UI_UPDATE_DOWNLOADING: &str = "Downloading…";
+pub const EN_UI_UPDATE_UP_TO_DATE: &str = "You have the latest version";
+pub const EN_UI_UPDATE_CHECK_FAILED: &str = "Could not check for updates";
+pub const EN_UI_UPDATE_DOWNLOAD_FAILED: &str = "Could not download the update";
+pub const EN_UI_UPDATE_INSTALLER_NOTE: &str =
+    "The installer will open after the download, and this copy will close.";
+pub const EN_UI_UPDATE_PORTABLE_NOTE: &str =
+    "Only the program file will be replaced. Settings in the data folder are kept.";
 pub const EN_UI_ABOUT_AUTHOR: &str = "Author";
 pub const EN_UI_ABOUT_VERSION: &str = "Version";
 pub const EN_UI_ABOUT_REPOSITORY: &str = "Repository";
